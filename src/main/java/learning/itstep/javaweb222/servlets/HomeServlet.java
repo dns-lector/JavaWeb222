@@ -8,16 +8,20 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import learning.itstep.javaweb222.data.DataAccessor;
+import learning.itstep.javaweb222.services.config.ConfigService;
 import learning.itstep.javaweb222.services.kdf.KdfService;
 
 // @WebServlet("")   // сервлет для головної сторінки -- 
 @Singleton           // анотацію замінено з введенням ІоС
 public class HomeServlet extends HttpServlet {
     private final KdfService kdfService;
+    private final DataAccessor dataAccessor;
 
     @Inject
-    public HomeServlet(KdfService kdfService) {
+    public HomeServlet(KdfService kdfService, DataAccessor dataAccessor ) {
         this.kdfService = kdfService;
+        this.dataAccessor = dataAccessor;
     }
     
     @Override
@@ -25,7 +29,11 @@ public class HomeServlet extends HttpServlet {
         System.out.println("HomeServlet::doGet");  // вивід до out сервера (Apache)
         // атрибут, що буде у req протягом подальшої обробки (у т.ч. на JSP)
         req.setAttribute("HomeServlet", 
-                "Hello from HomeServlet " + kdfService.dk("123", ""));
+                "Hello from HomeServlet " 
+                + kdfService.dk("123", "")
+                        + "<br/>"
+                + dataAccessor.getDbIdentity()
+        );
         
         // return View()
         req.getRequestDispatcher("index.jsp").forward(req, resp);
