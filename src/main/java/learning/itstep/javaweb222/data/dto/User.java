@@ -1,5 +1,6 @@
 package learning.itstep.javaweb222.data.dto;
 
+import java.sql.ResultSet;
 import java.util.Date;
 import java.util.UUID;
 
@@ -10,6 +11,10 @@ public class User {
     private Date birthdate;
     private Date registeredAt;
     private Date deletedAt;
+    
+    public static User fromResultSet(ResultSet rs) {
+        return null;
+    }
 
     public UUID getId() {
         return id;

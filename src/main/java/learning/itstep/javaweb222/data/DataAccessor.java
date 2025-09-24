@@ -5,12 +5,15 @@ import com.google.inject.Singleton;
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import learning.itstep.javaweb222.data.dto.User;
+import learning.itstep.javaweb222.data.dto.UserAccess;
 import learning.itstep.javaweb222.services.config.ConfigService;
 import learning.itstep.javaweb222.services.kdf.KdfService;
 
@@ -27,6 +30,26 @@ public class DataAccessor {
         this.configService = configService;
         this.logger = logger;
         this.kdfService = kdfService;
+    }
+    
+    public User getUserByCredentials(String login, String password) {
+        String sql = "SELECT * FROM user_accesses ua WHERE ua.login = ?";
+        try(PreparedStatement prep = this.getConnection().prepareStatement(sql)) {
+            prep.setString(1, login);
+            ResultSet rs = prep.executeQuery();
+            if(rs.next()) {
+                UserAccess userAccess = UserAccess.fromResultSet(rs);
+                if(kdfService.dk(password, userAccess.getSalt())
+                        .equals(userAccess.getDk())) {
+                    
+                }
+            }
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getUserByCredentials " 
+                    + ex.getMessage() + " | " + sql);
+        }
+        return null;
     }
     
     public Connection getConnection() {
