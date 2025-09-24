@@ -33,7 +33,7 @@ public class DataAccessor {
     }
     
     public User getUserByCredentials(String login, String password) {
-        String sql = "SELECT * FROM user_accesses ua WHERE ua.login = ?";
+        String sql = "SELECT * FROM user_accesses ua JOIN users u ON ua.user_id = u.id WHERE ua.login = ?";
         try(PreparedStatement prep = this.getConnection().prepareStatement(sql)) {
             prep.setString(1, login);
             ResultSet rs = prep.executeQuery();
