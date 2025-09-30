@@ -1,6 +1,7 @@
 package learning.itstep.javaweb222.data.dto;
 
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.UUID;
 
 public class UserAccess {
@@ -11,8 +12,29 @@ public class UserAccess {
     private String salt;
     private String dk;
     
-    public static UserAccess fromResultSet(ResultSet rs) {
-        return null;
+    private User user;
+    
+    public static UserAccess fromResultSet(ResultSet rs) throws SQLException {
+        UserAccess ua = new UserAccess();
+        ua.setId(UUID.fromString( rs.getString("ua_id") ));
+        ua.setUserId(UUID.fromString( rs.getString("user_id") ));
+        ua.setRoleId( rs.getString("role_id") );
+        ua.setLogin( rs.getString("login") );
+        ua.setSalt( rs.getString("salt") );
+        ua.setDk( rs.getString("dk") );
+        
+        try { ua.setUser( User.fromResultSet(rs) ); }
+        catch(SQLException ignore){}
+        
+        return ua;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 
     public UUID getId() {

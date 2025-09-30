@@ -1,6 +1,7 @@
 package learning.itstep.javaweb222.ioc;
 
 import com.google.inject.servlet.ServletModule;
+import learning.itstep.javaweb222.filters.CorsFilter;
 import learning.itstep.javaweb222.servlets.HomeServlet;
 import learning.itstep.javaweb222.servlets.UserServlet;
 
@@ -8,6 +9,10 @@ public class ServletsConfig extends ServletModule {
 
     @Override
     protected void configureServlets() {
+        // Налаштування фільтрів
+        filter("/*").through(CorsFilter.class);
+        
+        // Налаштування сервлетів
         serve("/").with(HomeServlet.class);
         serve("/user").with(UserServlet.class);
     }

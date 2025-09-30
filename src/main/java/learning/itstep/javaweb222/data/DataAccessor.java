@@ -9,10 +9,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.util.Date;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import learning.itstep.javaweb222.data.dto.User;
+import learning.itstep.javaweb222.data.dto.AccessToken;
 import learning.itstep.javaweb222.data.dto.UserAccess;
 import learning.itstep.javaweb222.services.config.ConfigService;
 import learning.itstep.javaweb222.services.kdf.KdfService;
@@ -32,8 +34,48 @@ public class DataAccessor {
         this.kdfService = kdfService;
     }
     
-    public User getUserByCredentials(String login, String password) {
-        String sql = "SELECT * FROM user_accesses ua JOIN users u ON ua.user_id = u.id WHERE ua.login = ?";
+    public AccessToken getTokenByUserAccess(UserAccess ua) {
+        AccessToken at = new AccessToken();
+        at.setTokenId(UUID.randomUUID());
+        at.setIssuedAt(new Date());
+        at.setExpiredAt( new Date( at.getIssuedAt().getTime() + 1000 * 60 * 10 ) );
+        at.setUserAccessId(ua.getId());
+        at.setUserAccess(ua);
+        /*
+        Д.З. DataAccessor::getTokenByUserAccess
+        модифікувати алгоритм формування токена доступу:
+        якщо у користувача є активний токен (ще не прострочений), то оновити
+        у БД його термін дії (+10 хв від поточного часу), новий токен не створювати.
+        Якщо активного токена немає або він вже вичерпав термін, то створювати
+        новий.
+        (технічними словами, запит SQL буде або UPDATE або INSERT)
+        */
+        String sql = """
+                INSERT INTO tokens(token_id,user_access_id,issued_at,expired_at)
+                VALUES(?,?,?,?)
+        """;
+        try(PreparedStatement prep = this.getConnection().prepareStatement(sql)) {
+            prep.setString(1, at.getTokenId().toString());
+            prep.setString(2, at.getUserAccessId().toString());
+            prep.setTimestamp(3, new Timestamp(at.getIssuedAt().getTime()));
+            prep.setTimestamp(4, new Timestamp(at.getExpiredAt().getTime()));
+            prep.executeUpdate();
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getTokenByUserAccess " 
+                    + ex.getMessage() + " | " + sql);
+        }
+        return at;
+    }
+    
+    public UserAccess getUserAccessByCredentials(String login, String password) {
+        String sql = """
+            SELECT 
+               *
+            FROM 
+               user_accesses ua 
+               JOIN users u ON ua.user_id = u.user_id 
+            WHERE ua.login = ?""";
         try(PreparedStatement prep = this.getConnection().prepareStatement(sql)) {
             prep.setString(1, login);
             ResultSet rs = prep.executeQuery();
@@ -41,7 +83,7 @@ public class DataAccessor {
                 UserAccess userAccess = UserAccess.fromResultSet(rs);
                 if(kdfService.dk(password, userAccess.getSalt())
                         .equals(userAccess.getDk())) {
-                    
+                    return userAccess;
                 }
             }
         }
@@ -94,7 +136,7 @@ public class DataAccessor {
     
     public boolean install() {
         String sql = "CREATE TABLE  IF NOT EXISTS  users("
-                + "id            CHAR(36)     PRIMARY KEY,"
+                + "user_id       CHAR(36)     PRIMARY KEY,"
                 + "name          VARCHAR(64)  NOT NULL,"
                 + "email         VARCHAR(128) NOT NULL,"
                 + "birthdate     DATETIME     NULL,"
@@ -113,7 +155,7 @@ public class DataAccessor {
         }
         
         sql = "CREATE TABLE  IF NOT EXISTS  user_accesses("
-                + "id      CHAR(36)    PRIMARY KEY,"
+                + "ua_id   CHAR(36)    PRIMARY KEY,"
                 + "user_id CHAR(36)    NOT NULL,"
                 + "role_id VARCHAR(16) NOT NULL,"
                 + "login   VARCHAR(32) NOT NULL,"
@@ -134,7 +176,7 @@ public class DataAccessor {
         
         
         sql = "CREATE TABLE  IF NOT EXISTS  user_roles("
-                + "id          VARCHAR(16)  PRIMARY KEY,"
+                + "role_id     VARCHAR(16)  PRIMARY KEY,"
                 + "description VARCHAR(256) NOT NULL,"
                 + "can_create  TINYINT      NOT NULL DEFAULT 0,"
                 + "can_read    TINYINT      NOT NULL DEFAULT 0,"
@@ -153,7 +195,7 @@ public class DataAccessor {
         }
         
         sql = "CREATE TABLE  IF NOT EXISTS  tokens("
-                + "id             CHAR(36) PRIMARY KEY,"
+                + "token_id       CHAR(36) PRIMARY KEY,"
                 + "user_access_id CHAR(36) NOT NULL,"
                 + "issued_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,"
                 + "expired_at     DATETIME NULL"
@@ -173,7 +215,7 @@ public class DataAccessor {
     }
     
     public boolean seed() {
-        String sql = "INSERT INTO user_roles(id, description, can_create, "
+        String sql = "INSERT INTO user_roles(role_id, description, can_create, "
                 + "can_read, can_update, can_delete)"
                 + "VALUES('admin', 'Root Administrator', 1, 1, 1, 1) "
                 + "ON DUPLICATE KEY UPDATE "
@@ -190,7 +232,7 @@ public class DataAccessor {
                     + ex.getMessage() + " | " + sql);
             return false;
         }
-        sql = "INSERT INTO user_roles(id, description, can_create, "
+        sql = "INSERT INTO user_roles(role_id, description, can_create, "
                 + "can_read, can_update, can_delete)"
                 + "VALUES('guest', 'Self Registered User', 0, 0, 0, 0) "
                 + "ON DUPLICATE KEY UPDATE "
@@ -208,7 +250,7 @@ public class DataAccessor {
             return false;
         }
         
-        sql = "INSERT INTO users(id, name, email)"
+        sql = "INSERT INTO users(user_id, name, email)"
                 + "VALUES('69231c55-9851-11f0-b1b7-62517600596c', "
                 + "'Default Administrator', 'admin@localhost') "
                 + "ON DUPLICATE KEY UPDATE "
@@ -223,7 +265,7 @@ public class DataAccessor {
             return false;
         }
         
-        sql = "INSERT INTO user_accesses(id, user_id, role_id, login, salt, dk)"
+        sql = "INSERT INTO user_accesses(ua_id, user_id, role_id, login, salt, dk)"
                 + "VALUES('35326873-9852-11f0-b1b7-62517600596c', "
                 + "'69231c55-9851-11f0-b1b7-62517600596c', "
                 + "'admin', "

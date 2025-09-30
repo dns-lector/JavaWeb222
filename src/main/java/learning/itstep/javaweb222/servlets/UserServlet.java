@@ -1,6 +1,7 @@
 package learning.itstep.javaweb222.servlets;
 
 import com.google.gson.Gson;
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import jakarta.servlet.ServletException;
 // import jakarta.servlet.annotation.WebServlet;
@@ -9,15 +10,23 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Base64;
-import java.util.UUID;
-import learning.itstep.javaweb222.data.dto.User;
+import learning.itstep.javaweb222.data.DataAccessor;
+import learning.itstep.javaweb222.data.dto.AccessToken;
+import learning.itstep.javaweb222.data.dto.UserAccess;
+import learning.itstep.javaweb222.data.jwt.JwtToken;
 
 @Singleton
 public class UserServlet extends HttpServlet {
+    private final DataAccessor dataAccessor;
+    private final Gson gson = new Gson();
+        
+    @Inject
+    public UserServlet(DataAccessor dataAccessor) {
+        this.dataAccessor = dataAccessor;
+    }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        Gson gson = new Gson();
         // Автентифікація за RFC 7617                         // Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
         String authHeader = req.getHeader("Authorization");   // Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
         if(authHeader == null || "".equals(authHeader)) {
@@ -57,21 +66,32 @@ public class UserServlet extends HttpServlet {
             return;
         }
         
-        User user = new User()
-                .setId(UUID.randomUUID())
-                .setName("Петрович")
-                .setEmail("user@i.ua");
+        UserAccess ua = dataAccessor.getUserAccessByCredentials(parts[0], parts[1]);
+        if(ua == null) {
+            resp.setStatus(401);
+            resp.getWriter().print(
+                gson.toJson("Credentials rejected. Access denied")
+            );
+            return;
+        }
+        AccessToken at = dataAccessor.getTokenByUserAccess(ua);
+        JwtToken jwt = JwtToken.fromAccessToken(at);
         resp.setHeader("Content-Type", "application/json");
         resp.getWriter().print(
-                gson.toJson(user)
+                gson.toJson(jwt)
         );
     }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.getWriter().print(
+                gson.toJson("POST works")
+        );        
+    }    
+    
 }
 
 /*
-Д.З. Впровадити у курсовий проєкт фронтенд, налаштувати на ньому засоби
-автентифікації.
-На бекенді підготувати сервлет для автентифікації та реалізувати прийом
-даних від фронтенду.
-Використовувати процедуру, описану в розділі 2 стандарту RFC 7617 https://datatracker.ietf.org/doc/html/rfc7617#section-2
+Д.З. Реалізувати перевірку усіх стандартних НТТР-методів запиту
+від фронтенда до бекенда, пересвідчитись у задоволенні вимог CORS
 */       
