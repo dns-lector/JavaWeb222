@@ -3,13 +3,12 @@ package learning.itstep.javaweb222.servlets;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import jakarta.servlet.ServletException;
-//import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import learning.itstep.javaweb222.data.DataAccessor;
-import learning.itstep.javaweb222.services.config.ConfigService;
+import learning.itstep.javaweb222.services.Signature.SignatureService;
 import learning.itstep.javaweb222.services.kdf.KdfService;
 
 // @WebServlet("")   // сервлет для головної сторінки -- 
@@ -17,11 +16,13 @@ import learning.itstep.javaweb222.services.kdf.KdfService;
 public class HomeServlet extends HttpServlet {
     private final KdfService kdfService;
     private final DataAccessor dataAccessor;
+    private final SignatureService signatureService;
 
     @Inject
-    public HomeServlet(KdfService kdfService, DataAccessor dataAccessor ) {
+    public HomeServlet(KdfService kdfService, DataAccessor dataAccessor,SignatureService signatureService ) {
         this.kdfService = kdfService;
         this.dataAccessor = dataAccessor;
+        this.signatureService = signatureService;
     }
     
     @Override
@@ -32,10 +33,14 @@ public class HomeServlet extends HttpServlet {
                 "Hello from HomeServlet " 
                 + kdfService.dk("123", "")
                         + "<br/>"
-                + (dataAccessor.install() ? "Install OK" : "Install error" )
+                // + (dataAccessor.install() ? "Install OK" : "Install error" )
                         + "<br/>"
-                + (dataAccessor.seed() ? "Seed OK" : "Seed error" )
+                // + (dataAccessor.seed() ? "Seed OK" : "Seed error" )
+                + signatureService.getSignatureHex("123", "456") 
+                + "<br/>JWT: " + req.getAttribute("JWT")
+                + "<br/>JwtStatus: " + req.getAttribute("JwtStatus")
         );
+        // задача: вивести значення атрибутів запиту а) "JWT" б) "JwtStatus"
         
         // return View()
         req.getRequestDispatcher("index.jsp").forward(req, resp);
