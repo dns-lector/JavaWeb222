@@ -2,8 +2,7 @@ package learning.itstep.javaweb222.ioc;
 
 import com.google.inject.servlet.ServletModule;
 import learning.itstep.javaweb222.filters.*;
-import learning.itstep.javaweb222.servlets.HomeServlet;
-import learning.itstep.javaweb222.servlets.UserServlet;
+import learning.itstep.javaweb222.servlets.*;
 
 public class ServletsConfig extends ServletModule {
 
@@ -14,8 +13,9 @@ public class ServletsConfig extends ServletModule {
         filter("/*").through(AuthFilter.class);
         
         // Налаштування сервлетів
-        serve("/").with(HomeServlet.class);
-        serve("/user").with(UserServlet.class);
+        serve("/"       ).with(HomeServlet.class );
+        serve("/admin/*").with(AdminServlet.class);
+        serve("/user"   ).with(UserServlet.class );
     }
     
 }
