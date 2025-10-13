@@ -15,6 +15,7 @@ public class ServletsConfig extends ServletModule {
         // Налаштування сервлетів
         serve("/"       ).with(HomeServlet.class );
         serve("/admin/*").with(AdminServlet.class);
+        serve("/file/*" ).with(FileServlet.class );
         serve("/user"   ).with(UserServlet.class );
     }
     
