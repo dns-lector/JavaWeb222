@@ -8,7 +8,11 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Map;
+import java.util.UUID;
 import learning.itstep.javaweb222.data.DataAccessor;
+import learning.itstep.javaweb222.data.dto.ProductGroup;
 import learning.itstep.javaweb222.data.jwt.JwtToken;
 import learning.itstep.javaweb222.services.form.FormParseException;
 import learning.itstep.javaweb222.services.form.FormParseResult;
@@ -82,23 +86,39 @@ public class AdminServlet extends HttpServlet {
     }
     
     private void postGroup(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        String savedName = "No files";
+        resp.setContentType("application/json");
         try {
             FormParseResult res = formParseService.parse(req);
-            for(FileItem item : res.getFiles().values()) {
-                 savedName = storageService.save(item);
+            Collection<FileItem> files = res.getFiles().values();
+            if(files.isEmpty()) {
+                throw new FormParseException("Image file required");
             }
+            Map<String, String> fields = res.getFields();
+            ProductGroup productGroup = new ProductGroup();
+            productGroup.setName(fields.get("pg-name"));
+            productGroup.setDescription(fields.get("pg-description"));
+            productGroup.setSlug(fields.get("pg-slug"));
+            String parentId = fields.get("pg-parent-id");
+            if(parentId != null && !parentId.isBlank()) {
+                productGroup.setParentId(UUID.fromString(parentId));
+            }
+            productGroup.setImageUrl(
+                    storageService.save(files.stream().findFirst().get()));
+            dataAccessor.addProductGroup(productGroup);
+            resp.getWriter().print(
+                    gson.toJson("Ok")
+            );
         }
         catch(FormParseException ex) {
-            savedName = ex.getMessage();
+            resp.setStatus(400);
+            resp.getWriter().print(
+                    gson.toJson(ex.getMessage()));
         }
-        resp.setContentType("application/json");
-        resp.getWriter().print(
-                gson.toJson(savedName)
-        );
     }
 }
 /*
-Д.З. Реалізувати інструментарій адміністратора у власному курсовому проєкті.
-Прикласти посилання на репозиторії та додати скріншоти роботи
+Д.З. Реалізувати валідацію даних на створення нової групи.
+За умов приходу неправильних даних надсилати відповідні 
+статуси та повідомлення від бекенду
+* додати відповідні елементи на фронтенді
 */
