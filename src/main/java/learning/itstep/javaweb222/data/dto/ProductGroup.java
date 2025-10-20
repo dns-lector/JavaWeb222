@@ -3,7 +3,9 @@ package learning.itstep.javaweb222.data.dto;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 public class ProductGroup {
@@ -14,6 +16,8 @@ public class ProductGroup {
     private String slug;
     private String imageUrl;
     private Date   deletedAt;
+    
+    private List<Product> products;
     
     public static ProductGroup fromResultSet(ResultSet rs) throws SQLException {
         ProductGroup pg = new ProductGroup();
@@ -31,7 +35,19 @@ public class ProductGroup {
         if(timestamp != null) {
             pg.setDeletedAt( new Date( timestamp.getTime() ) );
         }
+        try {
+            List<Product> products = new ArrayList<>();
+            do {
+                products.add( Product.fromResultSet(rs) );
+            } while(rs.next());
+            pg.products = products;
+        }
+        catch(Exception ignore) { }
         return pg;
+    }
+
+    public List<Product> getProducts() {
+        return products;
     }
 
     public UUID getId() {

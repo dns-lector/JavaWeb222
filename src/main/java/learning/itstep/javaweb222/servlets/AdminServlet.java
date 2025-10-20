@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 import learning.itstep.javaweb222.data.DataAccessor;
+import learning.itstep.javaweb222.data.dto.Product;
 import learning.itstep.javaweb222.data.dto.ProductGroup;
 import learning.itstep.javaweb222.data.jwt.JwtToken;
 import learning.itstep.javaweb222.services.form.FormParseException;
@@ -71,6 +72,7 @@ public class AdminServlet extends HttpServlet {
         String slug = req.getPathInfo() ;
         switch(slug) {
             case "/group": this.postGroup(req, resp); break;
+            case "/product": this.postProduct(req, resp); break;
             default: 
                 resp.setStatus(404);
                 resp.setContentType("text/plain");
@@ -83,6 +85,44 @@ public class AdminServlet extends HttpServlet {
         resp.getWriter().print( 
                 gson.toJson(dataAccessor.adminGetProductGroups())
         );
+    }
+    
+    private void postProduct(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.setContentType("application/json");
+        try {
+            FormParseResult res = formParseService.parse(req);
+            Collection<FileItem> files = res.getFiles().values();            
+            Map<String, String> fields = res.getFields();
+            Product product = new Product();
+            product.setName(fields.get("product-name"));
+            product.setDescription(fields.get("product-description"));
+            product.setSlug(fields.get("product-slug"));
+            
+            product.setPrice(Double.parseDouble(fields.get("product-price")));
+            product.setStock(Integer.parseInt(fields.get("product-stock")));
+            
+            String groupId = fields.get("product-group-id");
+            if(groupId != null && !groupId.isBlank()) {
+                product.setGroupId(UUID.fromString(groupId));
+            }
+            else {
+                throw new FormParseException("product-group-id required");
+            }
+            if(!files.isEmpty()) {
+                product.setImageUrl(
+                    storageService.save(files.stream().findFirst().get()));
+            }
+            
+            dataAccessor.addProduct(product);
+            resp.getWriter().print(
+                    gson.toJson("Ok")
+            );
+        }
+        catch(FormParseException ex) {
+            resp.setStatus(400);
+            resp.getWriter().print(
+                    gson.toJson(ex.getMessage()));
+        }
     }
     
     private void postGroup(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -117,7 +157,7 @@ public class AdminServlet extends HttpServlet {
     }
 }
 /*
-Д.З. Реалізувати валідацію даних на створення нової групи.
+Д.З. Реалізувати валідацію даних на створення нового товару.
 За умов приходу неправильних даних надсилати відповідні 
 статуси та повідомлення від бекенду
 * додати відповідні елементи на фронтенді

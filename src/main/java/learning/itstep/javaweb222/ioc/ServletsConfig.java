@@ -9,15 +9,17 @@ public class ServletsConfig extends ServletModule {
     @Override
     protected void configureServlets() {
         // Налаштування фільтрів
+        filter("/*").through(CharsetFilter.class);
         filter("/*").through(CorsFilter.class);
         filter("/*").through(AuthFilter.class);
         
         // Налаштування сервлетів
-        serve("/"       ).with(HomeServlet.class   );
-        serve("/admin/*").with(AdminServlet.class  );
-        serve("/file/*" ).with(FileServlet.class   );
-        serve("/groups" ).with(GroupsServlet.class );
-        serve("/user"   ).with(UserServlet.class   );
+        serve("/"         ).with(HomeServlet.class   );
+        serve("/admin/*"  ).with(AdminServlet.class  );
+        serve("/file/*"   ).with(FileServlet.class   );
+        serve("/groups"   ).with(GroupsServlet.class );
+        serve("/groups/*" ).with(GroupsServlet.class );
+        serve("/user"     ).with(UserServlet.class   );
     }
     
 }
