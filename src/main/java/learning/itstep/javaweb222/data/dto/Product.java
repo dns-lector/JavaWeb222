@@ -18,6 +18,8 @@ public class Product {
     private int    stock;
     private Date   deletedAt;
     
+    private ProductGroup group;
+    
     public static Product fromResultSet(ResultSet rs) throws SQLException {
         Product p = new Product();
         p.setId( UUID.fromString( rs.getString("product_id") ) );
@@ -33,7 +35,16 @@ public class Product {
         if(timestamp != null) {
             p.setDeletedAt( new Date( timestamp.getTime() ) );
         }
+        try {
+            p.group = ProductGroup.fromResultSet(rs, false);
+        }
+        catch(SQLException ignore) { }
+        
         return p;
+    }
+
+    public ProductGroup getGroup() {
+        return group;
     }
 
     public UUID getId() {

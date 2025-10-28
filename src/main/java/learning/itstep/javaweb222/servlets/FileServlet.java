@@ -64,5 +64,18 @@ public class FileServlet extends HttpServlet {
         }
     }
     
-    
+    public static String getFileUrl(HttpServletRequest req, String fileName) {
+        return String.format("%s://%s:%d%s/file/%s", 
+                req.getScheme(),
+                req.getServerName(),
+                req.getServerPort(),
+                req.getContextPath(),
+                fileName);
+    // req.getServletPath()  /groups
+    // req.getContextPath()  /JavaWeb222
+    // req.getRequestURI()   /JavaWeb222/groups
+    // req.getServerName()   localhost
+    // req.getScheme()       http
+    // req.getServerPort()   8080
+    }
 }

@@ -14,12 +14,15 @@ public class ServletsConfig extends ServletModule {
         filter("/*").through(AuthFilter.class);
         
         // Налаштування сервлетів
-        serve("/"         ).with(HomeServlet.class   );
-        serve("/admin/*"  ).with(AdminServlet.class  );
-        serve("/file/*"   ).with(FileServlet.class   );
-        serve("/groups"   ).with(GroupsServlet.class );
-        serve("/groups/*" ).with(GroupsServlet.class );
-        serve("/user"     ).with(UserServlet.class   );
+        serve("/"          ).with(HomeServlet.class   );
+        serve("/admin/*"   ).with(AdminServlet.class  );
+        serve("/cart"      ).with(CartServlet.class   );
+        serve("/cart/*"    ).with(CartServlet.class   );
+        serve("/file/*"    ).with(FileServlet.class   );
+        serve("/groups"    ).with(GroupsServlet.class );
+        serve("/groups/*"  ).with(GroupsServlet.class );
+        serve("/product/*" ).with(ProductServlet.class);
+        serve("/user"      ).with(UserServlet.class   );
     }
     
 }

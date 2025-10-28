@@ -38,6 +38,53 @@ public class DataAccessor {
         this.kdfService = kdfService;
     }
     
+    public void addToCart(String productId, String userId) throws Exception {
+        try {
+            UUID.fromString(productId);
+        }
+        catch(Exception ignore) {
+            throw new Exception("Invalid product id format. UUID expected");
+        }
+        try {
+            UUID.fromString(userId);
+        }
+        catch(Exception ignore) {
+            throw new Exception("Invalid user id format. UUID expected");
+        }
+        /*
+        Варіанти: 
+        1. У користувача немає відкритого кошику (це перше додавання
+            товару) -- відкриваємо (створюємо) новий кошик, створюємо новий запис
+            (cart_item) і додаємо його до кошику.
+        2. У користувача є відкритий кошик, але немає такого товару --
+            створюємо новий запис (cart_item) і додаємо його до кошику.
+        3. Є відкритий кошик і в ньому є такий товар --
+            збільшуємо кількість на 1 (з комерційних міркувань, з наукових - 
+            це виняткова ситуація)
+        */
+        throw new Exception("OK " + productId);
+    }
+    
+    public Product getProductBySlugOrId(String slug) {
+        String sql = "SELECT * FROM products p "
+                + "JOIN product_groups pg ON p.product_group_id = pg.pg_id "
+                + "WHERE p.product_slug = ? OR p.product_id = ?";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, slug);
+            prep.setString(2, slug);
+            ResultSet rs = prep.executeQuery();
+            if(rs.next()) {
+                return Product.fromResultSet( rs );
+            }
+            else return null;
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getProductBySlugOrId {0} ",
+                    ex.getMessage() + " | " + sql);
+            return null;
+        }    
+    }
+    
     public List<ProductGroup> getProductGroups() {
         String sql = "SELECT * FROM product_groups WHERE pg_deleted_at IS NULL";
         List<ProductGroup> ret = new ArrayList<>();
@@ -73,55 +120,7 @@ public class DataAccessor {
             return null;
         }    
     }
-    
-    public void addProduct(Product product) {
-        if(product.getId() == null) {
-            product.setId( getDbIdentity() );
-        }
-        String sql = "INSERT INTO products(product_id, product_group_id, product_name,"
-                + "product_description, product_slug, product_image_url, product_price, "
-                + "product_stock) VALUES(?,?,?,?,?,?,?,?)";
-        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
-            prep.setString(1, product.getId().toString());
-            prep.setString(2, product.getGroupId().toString());
-            prep.setString(3, product.getName());
-            prep.setString(4, product.getDescription());
-            prep.setString(5, product.getSlug());
-            prep.setString(6, product.getImageUrl());
-            prep.setDouble(7, product.getPrice());
-            prep.setInt(8, product.getStock());
-            prep.executeUpdate();
-        }
-        catch(SQLException ex) {
-            logger.log(Level.WARNING, "DataAccessor::addProduct " 
-                    + ex.getMessage() + " | " + sql);
-            throw new RuntimeException(ex.getMessage());
-        }
-    }
-    
-    public void addProductGroup(ProductGroup productGroup) {
-        if(productGroup.getId() == null) {
-            productGroup.setId( getDbIdentity() );
-        }
-        String sql = "INSERT INTO product_groups(pg_id, pg_parent_id, pg_name,"
-                + "pg_description, pg_slug, pg_image_url) VALUES(?,?,?,?,?,?)";
-        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
-            prep.setString(1, productGroup.getId().toString());
-            UUID parentId = productGroup.getParentId();
-            prep.setString(2, parentId == null ? null : parentId.toString());
-            prep.setString(3, productGroup.getName());
-            prep.setString(4, productGroup.getDescription());
-            prep.setString(5, productGroup.getSlug());
-            prep.setString(6, productGroup.getImageUrl());
-            prep.executeUpdate();
-        }
-        catch(SQLException ex) {
-            logger.log(Level.WARNING, "DataAccessor::addProductGroup " 
-                    + ex.getMessage() + " | " + sql);
-            throw new RuntimeException(ex.getMessage());
-        }
-    }
-    
+       
     public AccessToken getTokenByUserAccess(UserAccess ua) {
         AccessToken at = new AccessToken();
         at.setTokenId(UUID.randomUUID());
@@ -344,6 +343,47 @@ public class DataAccessor {
             return false;
         }
         
+        
+        // ------------------ Added 2025-10-28 ----------------
+        sql = "CREATE TABLE  IF NOT EXISTS  cart_items("
+                + "ci_id         CHAR(36)      PRIMARY KEY,"
+                + "ci_cart_id    CHAR(36)      NOT NULL,"
+                + "ci_product_id CHAR(36)      NOT NULL,"
+                + "ci_di_id      CHAR(36)          NULL  COMMENT 'ref to discount_items table',"
+                + "ci_quantity   INT           NOT NULL  DEFAULT 1,"
+                + "ci_price      DECIMAL(14,2) NOT NULL,"
+                + "ci_deleted_at DATETIME          NULL"
+                + ")ENGINE = INNODB, "
+                + " DEFAULT CHARSET = utf8mb4, "
+                + " COLLATE utf8mb4_unicode_ci";
+        try(Statement statement = this.getConnection().createStatement()) {
+            statement.executeUpdate(sql);
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::install {0}",
+                    ex.getMessage() + " | " + sql);
+            return false;
+        }
+        sql = "CREATE TABLE  IF NOT EXISTS  carts("
+                + "cart_id         CHAR(36)      PRIMARY KEY,"
+                + "cart_user_id    CHAR(36)      NOT NULL,"
+                + "cart_di_id      CHAR(36)          NULL  COMMENT 'ref to discount_items table',"
+                + "cart_price      DECIMAL(15,2) NOT NULL,"
+                + "cart_created_at DATETIME      NOT NULL  DEFAULT CURRENT_TIMESTAMP,"
+                + "cart_paid_at    DATETIME          NULL,"
+                + "cart_deleted_at DATETIME          NULL"
+                + ")ENGINE = INNODB, "
+                + " DEFAULT CHARSET = utf8mb4, "
+                + " COLLATE utf8mb4_unicode_ci";
+        try(Statement statement = this.getConnection().createStatement()) {
+            statement.executeUpdate(sql);
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::install {0}",
+                    ex.getMessage() + " | " + sql);
+            return false;
+        }
+        
         return true;
     }
     
@@ -443,6 +483,55 @@ public class DataAccessor {
     public void adminAddProductGroup() {
         
     }
+        
+    public void addProduct(Product product) {
+        if(product.getId() == null) {
+            product.setId( getDbIdentity() );
+        }
+        String sql = "INSERT INTO products(product_id, product_group_id, product_name,"
+                + "product_description, product_slug, product_image_url, product_price, "
+                + "product_stock) VALUES(?,?,?,?,?,?,?,?)";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, product.getId().toString());
+            prep.setString(2, product.getGroupId().toString());
+            prep.setString(3, product.getName());
+            prep.setString(4, product.getDescription());
+            prep.setString(5, product.getSlug());
+            prep.setString(6, product.getImageUrl());
+            prep.setDouble(7, product.getPrice());
+            prep.setInt(8, product.getStock());
+            prep.executeUpdate();
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::addProduct " 
+                    + ex.getMessage() + " | " + sql);
+            throw new RuntimeException(ex.getMessage());
+        }
+    }
+    
+    public void addProductGroup(ProductGroup productGroup) {
+        if(productGroup.getId() == null) {
+            productGroup.setId( getDbIdentity() );
+        }
+        String sql = "INSERT INTO product_groups(pg_id, pg_parent_id, pg_name,"
+                + "pg_description, pg_slug, pg_image_url) VALUES(?,?,?,?,?,?)";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, productGroup.getId().toString());
+            UUID parentId = productGroup.getParentId();
+            prep.setString(2, parentId == null ? null : parentId.toString());
+            prep.setString(3, productGroup.getName());
+            prep.setString(4, productGroup.getDescription());
+            prep.setString(5, productGroup.getSlug());
+            prep.setString(6, productGroup.getImageUrl());
+            prep.executeUpdate();
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::addProductGroup " 
+                    + ex.getMessage() + " | " + sql);
+            throw new RuntimeException(ex.getMessage());
+        }
+    }
+    
 }
 /*
 Д.З. Реалізувати ініціалізацію даних (БД) у власному курсовому проєкті
