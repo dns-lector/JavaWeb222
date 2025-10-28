@@ -17,6 +17,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import learning.itstep.javaweb222.data.dto.AccessToken;
+import learning.itstep.javaweb222.data.dto.Cart;
 import learning.itstep.javaweb222.data.dto.Product;
 import learning.itstep.javaweb222.data.dto.ProductGroup;
 import learning.itstep.javaweb222.data.dto.UserAccess;
@@ -62,7 +63,34 @@ public class DataAccessor {
             збільшуємо кількість на 1 (з комерційних міркувань, з наукових - 
             це виняткова ситуація)
         */
+        Cart activeCart = this.getActiveCart(userId);
+        if(activeCart == null) {
+            activeCart = this.createCart(userId);
+        }
         throw new Exception("OK " + productId);
+    }
+    
+    public Cart createCart(String userId) {
+        return null;
+    }
+    
+    public Cart getActiveCart(String userId) {
+        String sql = "SELECT * FROM carts c "
+                + "JOIN cart_items ci ON ci.ci_cart_id = c.cart_id "
+                + "WHERE c.cart_user_id = ? AND c.paid_at IS NULL AND c.deleted_at IS NULL";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, userId);
+            ResultSet rs = prep.executeQuery();
+            if(rs.next()) {
+                return Cart.fromResultSet( rs );
+            }
+            else return null;
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getActiveCart {0} ",
+                    ex.getMessage() + " | " + sql);
+            return null;
+        }    
     }
     
     public Product getProductBySlugOrId(String slug) {
