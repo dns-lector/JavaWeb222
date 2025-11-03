@@ -16,7 +16,7 @@ public class CartItem {
     private int    quantity;
     private Date   deletedAt;
     
-    public static CartItem fromResultSet(ResultSet rs) throws SQLException {
+    public static CartItem fromResultSet(ResultSet rs) throws Exception {
         CartItem item = new CartItem();
         item.setId(UUID.fromString(rs.getString("ci_id")));
         item.setCartId(UUID.fromString(rs.getString("ci_cart_id")));

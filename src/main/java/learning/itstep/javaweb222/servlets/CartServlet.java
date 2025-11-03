@@ -55,6 +55,23 @@ public class CartServlet extends HttpServlet {
     }
 
     @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        try {
+            this.restResponse.setData(
+                    dataAccessor.getActiveCart(
+                            jwtToken.getPayload().getSub()));
+            this.restResponse.getMeta().setDataType("object");
+        }
+        catch(Exception ex) {
+            this.restResponse.getMeta().setDataType("string");
+            this.restResponse.setStatus(RestStatus.status400);
+            this.restResponse.setData(ex.getMessage());
+        }
+    }
+    
+    
+
+    @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String productId = req.getParameter("product-id");
         this.restResponse.getMeta().setDataType("string");
