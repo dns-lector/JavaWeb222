@@ -48,7 +48,7 @@ public class ProductGroup {
                 } while(rs.next());
                 pg.products = products;
             }
-            catch(SQLException ignore) { }
+            catch(Exception ignore) { }
         }
         return pg;
     }

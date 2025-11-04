@@ -17,7 +17,7 @@ public class Cart {
     private Date   paidAt;
     private Date   deletedAt;
     
-    private List<CartItem> cartItems;
+    private List<CartItem> cartItems = new ArrayList<>();
     
     
     public static Cart fromResultSet(ResultSet rs) throws SQLException {

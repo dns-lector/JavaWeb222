@@ -16,6 +16,8 @@ public class CartItem {
     private int    quantity;
     private Date   deletedAt;
     
+    private Product product;
+    
     public static CartItem fromResultSet(ResultSet rs) throws Exception {
         CartItem item = new CartItem();
         item.setId(UUID.fromString(rs.getString("ci_id")));
@@ -35,8 +37,19 @@ public class CartItem {
         if (timestamp != null) {
             item.setDeletedAt(new Date(timestamp.getTime()));
         }
-
+        
+        try { item.setProduct( Product.fromResultSet(rs) ); }
+        catch(Exception ignore){}
+        
         return item;
+    }
+
+    public Product getProduct() {
+        return product;
+    }
+
+    public void setProduct(Product product) {
+        this.product = product;
     }
 
     public UUID getId() {
