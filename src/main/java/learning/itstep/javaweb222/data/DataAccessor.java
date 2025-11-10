@@ -97,7 +97,7 @@ public class DataAccessor {
         Cart cart = new Cart();
         String sql = "SELECT * FROM cart_items ci "
                 + "JOIN products p ON ci.ci_product_id = p.product_id "
-                + "WHERE ci.ci_cart_id = ?" ;
+                + "WHERE ci.ci_deleted_at IS NULL AND ci.ci_cart_id = ?" ;
         try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
             prep.setString(1, cartId);
             logger.log(Level.INFO, "DataAccessor::updateDiscount {0} ", sql);
@@ -214,7 +214,8 @@ public class DataAccessor {
         String sql = "SELECT * FROM carts c "
                 + "LEFT JOIN cart_items ci ON ci.ci_cart_id = c.cart_id "
                 + "LEFT JOIN products p ON ci.ci_product_id = p.product_id "
-                + "WHERE c.cart_user_id = ? AND c.cart_paid_at IS NULL AND c.cart_deleted_at IS NULL";
+                + "WHERE c.cart_user_id = ? AND c.cart_paid_at IS NULL "
+                + "AND c.cart_deleted_at IS NULL AND ci.ci_deleted_at IS NULL";
         try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
             prep.setString(1, userId);
             ResultSet rs = prep.executeQuery();
@@ -228,6 +229,58 @@ public class DataAccessor {
                     ex.getMessage() + " | " + sql);
             return null;
         }    
+    }
+    
+    public void checkoutActiveCart(String userId) throws Exception {
+        Cart activeCart = this.getActiveCart(userId);
+        if(activeCart == null) {
+            throw new Exception("User has no active cart");
+        }
+        String sql = "UPDATE carts SET cart_deleted_at = CURRENT_TIMESTAMP WHERE cart_id = ?";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql) ) {
+            prep.setString( 1, activeCart.getId().toString() );
+            prep.executeUpdate();
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::checkoutActiveCart {0} ",
+                    ex.getMessage() + " | " + sql);
+            throw ex;
+        }
+    }
+    
+    public void deleteCartItem(String cartItemId) throws Exception {
+        String sql = "SELECT * FROM cart_items ci WHERE ci_id = ?";
+        CartItem cartItem = null;
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, cartItemId);
+            ResultSet rs = prep.executeQuery();
+            if(rs.next()) {
+                cartItem = CartItem.fromResultSet( rs );
+            }
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::deleteCartItem {0} ",
+                    ex.getMessage() + " | " + sql);
+            throw ex;
+        }
+        if(cartItem == null) {
+            throw new Exception("No cart item with id given");
+        }
+        if(cartItem.getDeletedAt() != null) {
+            throw new Exception("Cart item has been deleted previously");
+        }
+        
+        sql = "UPDATE cart_items SET ci_deleted_at = CURRENT_TIMESTAMP WHERE ci_id = ?";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql) ) {
+            prep.setString(1, cartItemId);
+            prep.executeUpdate();
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::deleteCartItem {0} ",
+                    ex.getMessage() + " | " + sql);
+            throw ex;
+        }
+        this.updateDiscount( cartItem.getCartId().toString() );
     }
     
     public void modifyCartItem(String cartItemId, int increment) throws Exception {
