@@ -67,6 +67,7 @@ public class CartServlet extends HttpServlet {
     }
     
     // Робота з нестандартним методом запиту (не забути додати до CORS)
+    // "Повтор кошику"
     private void doLink(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String cartId = req.getPathInfo();
         if(cartId == null || cartId.isBlank() || "/".equals(cartId)) {

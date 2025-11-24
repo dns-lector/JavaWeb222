@@ -23,6 +23,7 @@ import learning.itstep.javaweb222.data.dto.Cart;
 import learning.itstep.javaweb222.data.dto.CartItem;
 import learning.itstep.javaweb222.data.dto.Product;
 import learning.itstep.javaweb222.data.dto.ProductGroup;
+import learning.itstep.javaweb222.data.dto.User;
 import learning.itstep.javaweb222.data.dto.UserAccess;
 import learning.itstep.javaweb222.services.config.ConfigService;
 import learning.itstep.javaweb222.services.kdf.KdfService;
@@ -161,7 +162,13 @@ public class DataAccessor {
     }
     
     private void incCartItem(CartItem cartItem) throws SQLException {
-        String sql = "UPDATE cart_items SET ci_quantity = ci_quantity + 1 WHERE ci_id = ? ";
+        incCartItem(cartItem, 1);
+    }
+    
+    private void incCartItem(CartItem cartItem, int inc) throws SQLException {
+        String sql = String.format(
+            "UPDATE cart_items SET ci_quantity = ci_quantity + %d WHERE ci_id = ? ",
+            inc);
         try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
             prep.setString(1, cartItem.getId().toString());
             logger.log(Level.INFO, "DataAccessor::incCartItem {0} ", sql);
@@ -180,6 +187,22 @@ public class DataAccessor {
         try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
             prep.setString(1, activeCart.getId().toString());
             prep.setString(2, productGuid.toString());
+            prep.executeUpdate();
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::createCartItem {0} ",
+                    ex.getMessage() + " | " + sql);
+            throw ex;
+        }
+    }
+    
+    private void createCartItem(Cart activeCart, CartItem baseCartItem) throws SQLException {
+        String sql = "INSERT INTO cart_items(ci_id, ci_cart_id, ci_product_id, ci_price, ci_quantity) "
+                + "VALUES(UUID(), ?, ?, -1, ?)";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, activeCart.getId().toString());
+            prep.setString(2, baseCartItem.getProductId().toString());
+            prep.setInt(3, baseCartItem.getQuantity());
             prep.executeUpdate();
         }
         catch(SQLException ex) {
@@ -254,10 +277,68 @@ public class DataAccessor {
         }   
     }
     
-    public void repeatCart(String userId, String cartId) {
+    public Cart getCartById(String cartId) {
+        String sql = "SELECT * FROM carts c "
+                + "LEFT JOIN cart_items ci ON ci.ci_cart_id = c.cart_id "
+                + "LEFT JOIN products p ON ci.ci_product_id = p.product_id "
+                + "WHERE c.cart_id = ? "
+                + " AND ci.ci_deleted_at IS NULL";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, cartId);
+            ResultSet rs = prep.executeQuery();
+            if(rs.next()) {
+                return Cart.fromResultSet( rs );
+            }
+            else return null;
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getCartById {0} ",
+                    ex.getMessage() + " | " + sql);
+            return null;
+        }   
+    }
+    
+    public void repeatCart(String userId, String cartId) throws Exception {
         // Перевіряємо, що userId, cartId відповідають реальним сутностям
+        Cart cart = getCartById(cartId);
+        if(cart == null) {
+            throw new Exception("Cart not found for id: " + cartId);
+        }
+        User user = getUserById(userId);
+        if(user == null) {
+            throw new Exception("User not found for id: " + userId);
+        }
+        
         // Знаходимо активний кошик для користувача
+        Cart activeCart = getActiveCart(userId);
         // Якщо немає, то створюємо новий
+        if(activeCart == null) {
+            activeCart = createCart(userId);
+        }
+        
+        // проходимо по всіх елементах базового кошику (який повторюємо)
+        // і переносимо їх до активного кошику, попередньо перевіряючи, чи
+        // є вже в активному кошику відповідні елементи (якщо є, то додаємо,
+        // якщо ні - то створюємо)
+        for(CartItem baseCartItem : cart.getCartItems()) {
+            CartItem activeCartItem = activeCart   // шукаємо в активному кошику
+                .getCartItems()                    // елемент з тим самим
+                .stream()                          // ProductId
+                .filter((ci) -> ci.getProductId().equals(
+                        baseCartItem.getProductId()))
+                .findFirst()
+                .orElse(null);
+            
+            if(activeCartItem == null) {
+                this.createCartItem(activeCart, baseCartItem);
+            }
+            else {
+                this.incCartItem(    // ? контролювати макс. кількість по залишкам товару
+                        activeCartItem, 
+                        baseCartItem.getQuantity());        
+            }
+        }
+        updateDiscount(activeCart);
     }
     
     public List<Cart> getUserCarts(String userId) {
@@ -483,6 +564,22 @@ public class DataAccessor {
                     ex.getMessage() + " | " + sql);
         }
         return at;
+    }
+    
+    public User getUserById(String userId) {
+        String sql = "SELECT * FROM users u WHERE u.user_id = ?";
+        try(PreparedStatement prep = this.getConnection().prepareStatement(sql)) {
+            prep.setString(1, userId);
+            ResultSet rs = prep.executeQuery();
+            if(rs.next()) {
+                return User.fromResultSet(rs);                
+            }
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getUserById {0}", 
+                    ex.getMessage() + " | " + sql);
+        }
+        return null;
     }
     
     public UserAccess getUserAccessByCredentials(String login, String password) {
@@ -884,7 +981,13 @@ public class DataAccessor {
     
 }
 /*
-Д.З. Реалізувати ініціалізацію даних (БД) у власному курсовому проєкті
-Закласти проєкт з фронтендом.
-Прикласти до звіту два посилання на репозиторії бек- та фронт- частин
+Т.З. Реалізувати зворотній зв'язок за якістю:
+- оцінювання товару (лайк/дізлайк або за 5-бальною/зірковою системою)
+- коментарі до товарів, у т.ч. запитання
+- відповіді на коментарі/запитання
+? премодерація - публікація відгуків тільки після погодження адміністратором
+
+Д.З. repeatCart: забезпечити контроль за складськими залишками товарів (stock)
+-- якщо нова кількість товару перевищує залишки, то встановлювати макс. можливу
+кількість та формувати відповідне повідомлення для фронтенду
 */

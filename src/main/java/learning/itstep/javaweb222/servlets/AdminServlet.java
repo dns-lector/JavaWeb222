@@ -15,6 +15,9 @@ import learning.itstep.javaweb222.data.DataAccessor;
 import learning.itstep.javaweb222.data.dto.Product;
 import learning.itstep.javaweb222.data.dto.ProductGroup;
 import learning.itstep.javaweb222.data.jwt.JwtToken;
+import learning.itstep.javaweb222.rest.RestMeta;
+import learning.itstep.javaweb222.rest.RestResponse;
+import learning.itstep.javaweb222.rest.RestStatus;
 import learning.itstep.javaweb222.services.form.FormParseException;
 import learning.itstep.javaweb222.services.form.FormParseResult;
 import learning.itstep.javaweb222.services.form.FormParseService;
@@ -27,6 +30,8 @@ public class AdminServlet extends HttpServlet {
     private final DataAccessor dataAccessor;
     private final FormParseService formParseService;
     private final StorageService storageService;
+    private RestResponse restResponse;
+    private JwtToken jwtToken;
 
     @Inject
     public AdminServlet(
@@ -38,23 +43,44 @@ public class AdminServlet extends HttpServlet {
         this.formParseService = formParseService;
         this.storageService = storageService;
     }
+    
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        this.restResponse = new RestResponse();
+        restResponse.setMeta(
+                new RestMeta()
+                .setServiceName("Admin API")
+                .setCacheSeconds(1000)
+                .setManipulations(new String[] {"GET", "POST"})
+                .setLinks(Map.ofEntries(
+                    Map.entry("add-to-cart", "POST /cart?product-id={id}")
+                ) )
+        );
+        jwtToken = (JwtToken) req.getAttribute("JWT");
+        if(jwtToken == null) {
+            this.restResponse.setStatus(RestStatus.status401);
+        }
+        else {
+            /* if(req.getMethod().equals("LINK")) {
+                this.doLink(req, resp);
+            }
+            else */ super.service(req, resp); 
+        } 
+        
+        resp.setContentType("application/json; charset=utf-8");
+        resp.getWriter().print(
+                gson.toJson(restResponse)
+        );
+    }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        JwtToken jwtToken = (JwtToken) req.getAttribute("JWT");
-        if(jwtToken == null) {
-            resp.setStatus(401);
-            resp.setContentType("text/plain");
-            resp.getWriter().print( req.getAttribute("JwtStatus") );
-            return;
-        }        
         String slug = req.getPathInfo() ;
         switch(slug) {
             case "/groups": this.getGroups(req, resp); break;
             default: 
-                resp.setStatus(404);
-                resp.setContentType("text/plain");
-                resp.getWriter().print( "Slug " + slug + " not found" );
+                this.restResponse.setStatus(RestStatus.status404);
+                this.restResponse.setData("Slug " + slug + " not found");
         }
     }
     
@@ -62,33 +88,23 @@ public class AdminServlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        JwtToken jwtToken = (JwtToken) req.getAttribute("JWT");
-        if(jwtToken == null) {
-            resp.setStatus(401);
-            resp.setContentType("text/plain");
-            resp.getWriter().print( req.getAttribute("JwtStatus") );
-            return;
-        }
         String slug = req.getPathInfo() ;
         switch(slug) {
             case "/group": this.postGroup(req, resp); break;
             case "/product": this.postProduct(req, resp); break;
             default: 
-                resp.setStatus(404);
-                resp.setContentType("text/plain");
-                resp.getWriter().print( "Slug " + slug + " not found" );
+                this.restResponse.setStatus(RestStatus.status404);
+                this.restResponse.setData("Slug " + slug + " not found");
         }
     }
     
     private void getGroups(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        resp.setContentType("application/json");
-        resp.getWriter().print( 
-                gson.toJson(dataAccessor.adminGetProductGroups())
+        this.restResponse.setData( 
+                dataAccessor.adminGetProductGroups()
         );
     }
     
     private void postProduct(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        resp.setContentType("application/json");
         try {
             FormParseResult res = formParseService.parse(req);
             Collection<FileItem> files = res.getFiles().values();            
@@ -114,14 +130,12 @@ public class AdminServlet extends HttpServlet {
             }
             
             dataAccessor.addProduct(product);
-            resp.getWriter().print(
-                    gson.toJson("Ok")
-            );
+            this.restResponse.setData("Ok");
         }
         catch(FormParseException ex) {
-            resp.setStatus(400);
-            resp.getWriter().print(
-                    gson.toJson(ex.getMessage()));
+            this.restResponse.getMeta().setDataType("string");
+            this.restResponse.setStatus(RestStatus.status400);
+            this.restResponse.setData(ex.getMessage());
         }
     }
     
@@ -145,14 +159,12 @@ public class AdminServlet extends HttpServlet {
             productGroup.setImageUrl(
                     storageService.save(files.stream().findFirst().get()));
             dataAccessor.addProductGroup(productGroup);
-            resp.getWriter().print(
-                    gson.toJson("Ok")
-            );
+            this.restResponse.setData("Ok");
         }
         catch(FormParseException ex) {
-            resp.setStatus(400);
-            resp.getWriter().print(
-                    gson.toJson(ex.getMessage()));
+            this.restResponse.getMeta().setDataType("string");
+            this.restResponse.setStatus(RestStatus.status400);
+            this.restResponse.setData(ex.getMessage());
         }
     }
 }
