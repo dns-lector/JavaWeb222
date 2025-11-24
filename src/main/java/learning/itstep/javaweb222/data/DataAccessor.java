@@ -231,12 +231,75 @@ public class DataAccessor {
         }    
     }
     
+    public Cart getHistoryCart(String userId, String cartId) {
+        String sql = "SELECT * FROM carts c "
+                + "LEFT JOIN cart_items ci ON ci.ci_cart_id = c.cart_id "
+                + "LEFT JOIN products p ON ci.ci_product_id = p.product_id "
+                + "WHERE c.cart_user_id = ? "
+                + " AND c.cart_id = ? "
+                + " AND ci.ci_deleted_at IS NULL";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, userId);            
+            prep.setString(2, cartId);
+            ResultSet rs = prep.executeQuery();
+            if(rs.next()) {
+                return Cart.fromResultSet( rs );
+            }
+            else return null;
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getHistoryCart {0} ",
+                    ex.getMessage() + " | " + sql);
+            return null;
+        }   
+    }
+    
+    public void repeatCart(String userId, String cartId) {
+        // Перевіряємо, що userId, cartId відповідають реальним сутностям
+        // Знаходимо активний кошик для користувача
+        // Якщо немає, то створюємо новий
+    }
+    
+    public List<Cart> getUserCarts(String userId) {
+        String sql = "SELECT * FROM carts c "
+                + "LEFT JOIN cart_items ci ON ci.ci_cart_id = c.cart_id "
+                + "LEFT JOIN products p ON ci.ci_product_id = p.product_id "
+                + "WHERE c.cart_user_id = ? AND ci.ci_deleted_at IS NULL "
+                + "ORDER BY c.cart_created_at DESC";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, userId);
+            ResultSet rs = prep.executeQuery();
+            List<Cart> carts = new ArrayList<>();
+            boolean hasNext = rs.next();
+            while(hasNext) {
+                Cart cart = Cart.fromResultSet( rs, false ) ;
+                cart.setCartItems(new ArrayList<>());
+                do {
+                    try {
+                        CartItem ci = CartItem.fromResultSet(rs);
+                        cart.getCartItems().add(ci);
+                    }
+                    catch(Exception ignore){ break; }
+                    hasNext = rs.next();
+                } while(hasNext && 
+                        rs.getString("cart_id").equals(cart.getId().toString()));
+                carts.add(cart);
+            }
+            return carts;
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getUserCarts {0} ",
+                    ex.getMessage() + " | " + sql);
+            return null;
+        }    
+    }
+    
     public void checkoutActiveCart(String userId) throws Exception {
         Cart activeCart = this.getActiveCart(userId);
         if(activeCart == null) {
             throw new Exception("User has no active cart");
         }
-        String sql = "UPDATE carts SET cart_deleted_at = CURRENT_TIMESTAMP WHERE cart_id = ?";
+        String sql = "UPDATE carts SET cart_paid_at = CURRENT_TIMESTAMP WHERE cart_id = ?";
         try( PreparedStatement prep = getConnection().prepareStatement(sql) ) {
             prep.setString( 1, activeCart.getId().toString() );
             prep.executeUpdate();
@@ -363,8 +426,8 @@ public class DataAccessor {
             }
         }
         catch(SQLException ex) {
-            logger.log(Level.WARNING, "DataAccessor::getProductGroups " 
-                    + ex.getMessage() + " | " + sql);
+            logger.log(Level.WARNING, "DataAccessor::getProductGroups {0}" ,
+                    ex.getMessage() + " | " + sql);
         }
         return ret;
     }
@@ -382,8 +445,8 @@ public class DataAccessor {
             else return null;
         }
         catch(SQLException ex) {
-            logger.log(Level.WARNING, "DataAccessor::getProductGroupBySlug " 
-                    + ex.getMessage() + " | " + sql);
+            logger.log(Level.WARNING, "DataAccessor::getProductGroupBySlug {0}", 
+                    ex.getMessage() + " | " + sql);
             return null;
         }    
     }
@@ -416,8 +479,8 @@ public class DataAccessor {
             prep.executeUpdate();
         }
         catch(SQLException ex) {
-            logger.log(Level.WARNING, "DataAccessor::getTokenByUserAccess " 
-                    + ex.getMessage() + " | " + sql);
+            logger.log(Level.WARNING, "DataAccessor::getTokenByUserAccess {0}", 
+                    ex.getMessage() + " | " + sql);
         }
         return at;
     }
@@ -442,8 +505,28 @@ public class DataAccessor {
             }
         }
         catch(SQLException ex) {
-            logger.log(Level.WARNING, "DataAccessor::getUserByCredentials " 
-                    + ex.getMessage() + " | " + sql);
+            logger.log(Level.WARNING, "DataAccessor::getUserByCredentials {0}", 
+                    ex.getMessage() + " | " + sql);
+        }
+        return null;
+    }
+    
+    public UserAccess getUserAccess(String userId, String roleId) {
+        // перевіряємо чи є UserAccess із зазначеними даними
+        String sql = "SELECT * FROM user_accesses ua "
+                + "JOIN users u ON ua.user_id = u.user_id "
+                + "JOIN user_roles ur ON ua.role_id = ur.role_id "
+                + "WHERE u.user_id = ? AND ur.role_id = ?";
+        try (PreparedStatement ps = this.getConnection().prepareStatement(sql)) {
+            ps.setString(1, userId);
+            ps.setString(2, roleId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                return UserAccess.fromResultSet(rs);
+            }
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getUserAccess {0}",
+                    ex.getMessage() + " | " + sql);
         }
         return null;
     }

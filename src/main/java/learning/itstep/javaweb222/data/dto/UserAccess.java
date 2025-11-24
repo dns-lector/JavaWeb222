@@ -13,6 +13,7 @@ public class UserAccess {
     private String dk;
     
     private User user;
+    private UserRole userRole;
     
     public static UserAccess fromResultSet(ResultSet rs) throws SQLException {
         UserAccess ua = new UserAccess();
@@ -25,10 +26,21 @@ public class UserAccess {
         
         try { ua.setUser( User.fromResultSet(rs) ); }
         catch(SQLException ignore){}
+        try { ua.setUserRole( UserRole.fromResultSet(rs) ); }
+        catch(SQLException ignore){}
         
         return ua;
     }
 
+    public UserRole getUserRole() {
+        return userRole;
+    }
+
+    public void setUserRole(UserRole userRole) {
+        this.userRole = userRole;
+    }
+
+    
     public User getUser() {
         return user;
     }

@@ -11,7 +11,6 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @Singleton
@@ -44,8 +43,12 @@ public class CorsFilter implements Filter {
         resp.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
         // logger.log(Level.INFO, "CORS filter works");
         if( "OPTIONS".equals( req.getMethod() ) ) {
-            resp.setHeader("Access-Control-Allow-Headers", req.getHeader("Access-Control-Request-Headers"));
-            resp.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE");
+            resp.setHeader(
+                    "Access-Control-Allow-Headers", 
+                    req.getHeader("Access-Control-Request-Headers"));
+            resp.setHeader(
+                    "Access-Control-Allow-Methods", 
+                    req.getHeader("Access-Control-Request-Method"));
         }
     }
 

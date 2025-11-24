@@ -19,8 +19,11 @@ public class Cart {
     
     private List<CartItem> cartItems = new ArrayList<>();
     
-    
     public static Cart fromResultSet(ResultSet rs) throws SQLException {
+        return fromResultSet(rs, true);
+    }
+    
+    public static Cart fromResultSet(ResultSet rs, boolean includeItems) throws SQLException {
         Cart item = new Cart();
         item.setId( UUID.fromString( rs.getString("cart_id") ) );
         item.setUserId( UUID.fromString( rs.getString("cart_user_id") ) );
@@ -43,13 +46,15 @@ public class Cart {
         if(timestamp != null) {
             item.setDeletedAt( new Date( timestamp.getTime() ) );
         }
-        item.cartItems = new ArrayList<>();
-        try {
-            do {
-                item.cartItems.add( CartItem.fromResultSet(rs) );
-            } while(rs.next());
+        if(includeItems) {
+            item.cartItems = new ArrayList<>();
+            try {
+                do {
+                    item.cartItems.add( CartItem.fromResultSet(rs) );
+                } while(rs.next());
+            }
+            catch(Exception ignore) { }
         }
-        catch(Exception ignore) { }
         return item;
     }
 
