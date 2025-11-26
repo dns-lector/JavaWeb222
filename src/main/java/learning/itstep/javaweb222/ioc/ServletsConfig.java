@@ -22,6 +22,7 @@ public class ServletsConfig extends ServletModule {
         serve("/groups"    ).with(GroupsServlet.class );
         serve("/groups/*"  ).with(GroupsServlet.class );
         serve("/product/*" ).with(ProductServlet.class);
+        serve("/rate"      ).with(RateServlet.class   );
         serve("/user"      ).with(UserServlet.class   );
         serve("/user/*"    ).with(UserServlet.class   );
     }
