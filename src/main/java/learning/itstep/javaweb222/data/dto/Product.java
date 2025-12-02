@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import learning.itstep.javaweb222.servlets.FileServlet;
 
@@ -21,6 +22,7 @@ public class Product {
     private Date   deletedAt;
     
     private ProductGroup group;
+    private Rate rate;
     
     public static Product fromResultSet(ResultSet rs) throws Exception {
         Product p = new Product();
@@ -39,8 +41,15 @@ public class Product {
         }
         try {
             p.group = ProductGroup.fromResultSet(rs, false);
-        }
-        catch(SQLException ignore) { }
+        }        
+        catch(Exception ignore) { }
+        
+        try {
+            p.rate = Rate.fromResultSet(rs);
+            /* TODO: реалізувати завантаження усіх відгуків про товар
+            (опціонально, окремим параметром у методі-фабриці) */
+        }        
+        catch(Exception ignore) { }
         
         return p;
     }
@@ -49,6 +58,14 @@ public class Product {
         if(imageUrl != null) {
             imageUrl = FileServlet.getFileUrl(req, imageUrl);
         }
+    }
+
+    public Rate getRate() {
+        return rate;
+    }
+
+    public void setRate(Rate rate) {
+        this.rate = rate;
     }
 
     public ProductGroup getGroup() {

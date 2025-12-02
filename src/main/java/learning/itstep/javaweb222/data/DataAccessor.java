@@ -2,7 +2,6 @@ package learning.itstep.javaweb222.data;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import jakarta.ws.rs.NotFoundException;
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverManager;
@@ -25,6 +24,7 @@ import learning.itstep.javaweb222.data.dto.Product;
 import learning.itstep.javaweb222.data.dto.ProductGroup;
 import learning.itstep.javaweb222.data.dto.User;
 import learning.itstep.javaweb222.data.dto.UserAccess;
+import learning.itstep.javaweb222.models.rate.RateFormModel;
 import learning.itstep.javaweb222.services.config.ConfigService;
 import learning.itstep.javaweb222.services.kdf.KdfService;
 
@@ -41,6 +41,52 @@ public class DataAccessor {
         this.configService = configService;
         this.logger = logger;
         this.kdfService = kdfService;
+    }
+    
+    public void addRate(RateFormModel rateFormModel) throws Exception {
+        // Перевіряємо дані на валідні UUID
+        UUID.fromString( rateFormModel.getCartItemId() );
+        UUID.fromString( rateFormModel.getProductId()  );
+        
+        //  Перевіряємо, чи існують ІД сутностей, а також 
+        //  - що у переданому кошику є продукт, що коментується
+        //  - немає попереднього коментаря на нього.
+        String sql = "SELECT * FROM cart_items ci "
+                + "JOIN products p ON ci.ci_product_id = p.product_id "
+                + "LEFT JOIN rates r ON ci.ci_id = r.ci_id "
+                + "WHERE ci.ci_id = ? AND p.product_id = ?";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql) ) {
+            prep.setString( 1, rateFormModel.getCartItemId() );
+            prep.setString( 2, rateFormModel.getProductId()  );
+            ResultSet rs = prep.executeQuery();
+            if( ! rs.next() ) {
+                throw new Exception("CartItemId or ProductId not found");
+            }
+            if( rs.getString("rate_id") != null ) {
+                throw new Exception("Rate exists already");
+            }            
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::addRate {0} ",
+                    ex.getMessage() + " | " + sql);
+            throw ex;
+        }
+        
+        sql = "INSERT INTO rates(rate_id, user_id, ci_id, item_id, "
+                + "rate_text, rate_stars ) VALUES( UUID(), ?, ?, ?, ?, ? )";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql) ) {
+            prep.setString( 1, rateFormModel.getUserId() );
+            prep.setString( 2, rateFormModel.getCartItemId() );
+            prep.setString( 3, rateFormModel.getProductId() );
+            prep.setString( 4, rateFormModel.getComment() );
+            prep.setInt(    5, rateFormModel.getRate() );
+            prep.executeUpdate();
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::addRate {0} ",
+                    ex.getMessage() + " | " + sql);
+            throw ex;
+        }
     }
     
     public void addToCart(String productId, String userId) throws Exception {
@@ -258,6 +304,7 @@ public class DataAccessor {
         String sql = "SELECT * FROM carts c "
                 + "LEFT JOIN cart_items ci ON ci.ci_cart_id = c.cart_id "
                 + "LEFT JOIN products p ON ci.ci_product_id = p.product_id "
+                + "LEFT JOIN rates r ON p.product_id = r.item_id AND ci.ci_id = r.ci_id "
                 + "WHERE c.cart_user_id = ? "
                 + " AND c.cart_id = ? "
                 + " AND ci.ci_deleted_at IS NULL";
