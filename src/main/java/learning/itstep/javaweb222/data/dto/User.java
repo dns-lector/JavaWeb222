@@ -1,7 +1,6 @@
 package learning.itstep.javaweb222.data.dto;
 
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.UUID;
@@ -14,7 +13,7 @@ public class User {
     private Date registeredAt;
     private Date deletedAt;
     
-    public static User fromResultSet(ResultSet rs) throws SQLException {
+    public static User fromResultSet(ResultSet rs) throws Exception {
         User user = new User();
         user.setId(UUID.fromString( rs.getString("user_id") ));
         user.setName( rs.getString("name") );

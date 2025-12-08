@@ -145,9 +145,10 @@ public class DataAccessor {
         String sql = "SELECT * FROM cart_items ci "
                 + "JOIN products p ON ci.ci_product_id = p.product_id "
                 + "WHERE ci.ci_deleted_at IS NULL AND ci.ci_cart_id = ?" ;
+        
         try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
             prep.setString(1, cartId);
-            logger.log(Level.INFO, "DataAccessor::updateDiscount {0} ", sql);
+            // logger.log(Level.INFO, "DataAccessor::updateDiscount {0} ", sql);
             ResultSet rs = prep.executeQuery();
             while(rs.next()) {
                 CartItem cartItem = CartItem.fromResultSet(rs);
@@ -526,13 +527,15 @@ public class DataAccessor {
     public Product getProductBySlugOrId(String slug) {
         String sql = "SELECT * FROM products p "
                 + "JOIN product_groups pg ON p.product_group_id = pg.pg_id "
-                + "WHERE p.product_slug = ? OR p.product_id = ?";
+                + "LEFT JOIN rates r ON p.product_id = r.item_id "
+                + "LEFT JOIN users u ON r.user_id = u.user_id "
+                + "WHERE r.rate_deleted_at IS NULL AND (p.product_slug = ? OR p.product_id = ?)";
         try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
             prep.setString(1, slug);
             prep.setString(2, slug);
             ResultSet rs = prep.executeQuery();
             if(rs.next()) {
-                return Product.fromResultSet( rs );
+                return Product.fromResultSet( rs, true );
             }
             else return null;
         }
@@ -560,10 +563,48 @@ public class DataAccessor {
         return ret;
     }
     
-    public ProductGroup getProductGroupBySlug(String slug) {
-        String sql = "SELECT * FROM product_groups pg "
-                + "LEFT JOIN products p ON p.product_group_id = pg.pg_id "
-                + "WHERE pg.pg_slug = ?";
+    /*
+    Друга особливість пагінації полягає у необхідності попередньо
+    одержати загальну кількість елементів для визначення "останньої сторінки",
+    а також для розширеного контролю меж зміни номера сторінки.
+    */
+    public int getProductsCountByGroupSlug(String slug) {
+        // зазвичай для визначення кількості повністю повторюють 
+        // основний запит, тільки його вибірку замінюють на COUNT
+        String sql = "SELECT " +
+        " COUNT(*) " +
+        "FROM product_groups pg " +
+        "LEFT JOIN products p ON p.product_group_id = pg.pg_id " +
+        "WHERE pg.pg_slug = ? ";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, slug);
+            ResultSet rs = prep.executeQuery();
+            rs.next();
+            return rs.getInt(1);
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getProductsCountByGroupSlug {0}", 
+                    ex.getMessage() + " | " + sql);
+            return 0;
+        }    
+    }
+    
+    public ProductGroup getProductGroupBySlug(String slug, int page, int perPage) {
+//        String sql = "SELECT * FROM product_groups pg "
+//                + "LEFT JOIN products p ON p.product_group_id = pg.pg_id "
+//                + "WHERE pg.pg_slug = ?";
+        // Доповнено статистикою відгуків (оцінок)
+        // та пагінацією
+        int skip = (page - 1) * perPage;
+        String sql = "SELECT " +
+        " (SELECT COUNT(*) FROM rates r WHERE r.item_id = p.product_id AND r.rate_deleted_at IS NULL) AS rates_count, " +
+        " (SELECT AVG(r.rate_stars) FROM rates r WHERE r.item_id = p.product_id AND r.rate_stars > 0 AND r.rate_deleted_at IS NULL) AS rate_avg, " +
+        " pg.*, p.* " +
+        "FROM product_groups pg " +
+        "LEFT JOIN products p ON p.product_group_id = pg.pg_id " +
+        "WHERE pg.pg_slug = ? " +
+        "ORDER BY p.product_id " + 
+        String.format("LIMIT %d, %d", skip, perPage);
         try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
             prep.setString(1, slug);
             ResultSet rs = prep.executeQuery();
@@ -622,7 +663,7 @@ public class DataAccessor {
                 return User.fromResultSet(rs);                
             }
         }
-        catch(SQLException ex) {
+        catch(Exception ex) {
             logger.log(Level.WARNING, "DataAccessor::getUserById {0}", 
                     ex.getMessage() + " | " + sql);
         }
@@ -1013,7 +1054,11 @@ public class DataAccessor {
             prep.setString(2, product.getGroupId().toString());
             prep.setString(3, product.getName());
             prep.setString(4, product.getDescription());
-            prep.setString(5, product.getSlug());
+            String slug = product.getSlug();
+            if(slug != null && slug.length() == 0) {
+                slug = null;
+            }
+            prep.setString(5, slug);
             prep.setString(6, product.getImageUrl());
             prep.setDouble(7, product.getPrice());
             prep.setInt(8, product.getStock());

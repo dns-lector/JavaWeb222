@@ -35,11 +35,6 @@ public class CorsFilter implements Filter {
         HttpServletResponse resp = (HttpServletResponse)response;
         
         // прямий хід - оброблення запиту (request)
-        
-         
-        chain.doFilter(request, response);   // next
-        
-        // зворотній хід - оброблення відповіді (response)        
         resp.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
         // logger.log(Level.INFO, "CORS filter works");
         if( "OPTIONS".equals( req.getMethod() ) ) {
@@ -50,6 +45,11 @@ public class CorsFilter implements Filter {
                     "Access-Control-Allow-Methods", 
                     req.getHeader("Access-Control-Request-Method"));
         }
+         
+        chain.doFilter(request, response);   // next
+        
+        // зворотній хід - оброблення відповіді (response)        
+        
     }
 
     @Override

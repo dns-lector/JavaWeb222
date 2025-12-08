@@ -58,7 +58,7 @@ public class ProductServlet extends HttpServlet {
             this.restResponse.getMeta().setDataType("string");
         }
         else {
-            path = path.substring(1);
+            path = path.substring(1);            
             Product product = dataAccessor.getProductBySlugOrId(path);
             if(product == null) {                
                 this.restResponse.setStatus(RestStatus.status404);

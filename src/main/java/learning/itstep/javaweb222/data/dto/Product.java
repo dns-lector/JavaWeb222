@@ -2,8 +2,8 @@ package learning.itstep.javaweb222.data.dto;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -23,8 +23,15 @@ public class Product {
     
     private ProductGroup group;
     private Rate rate;
+    private double avgRate;
+    private int ratesCount;
+    private List<Rate> rates;
     
     public static Product fromResultSet(ResultSet rs) throws Exception {
+        return fromResultSet(rs, false);
+    }
+    
+    public static Product fromResultSet(ResultSet rs, boolean withRates) throws Exception {
         Product p = new Product();
         p.setId( UUID.fromString( rs.getString("product_id") ) );
         p.setGroupId( UUID.fromString( rs.getString("product_group_id") ) );
@@ -44,13 +51,27 @@ public class Product {
         }        
         catch(Exception ignore) { }
         
-        try {
-            p.rate = Rate.fromResultSet(rs);
-            /* TODO: реалізувати завантаження усіх відгуків про товар
-            (опціонально, окремим параметром у методі-фабриці) */
-        }        
-        catch(Exception ignore) { }
-        
+        if(withRates) {
+            p.rates = new ArrayList<>();
+            try {
+                do {
+                    p.rates.add( Rate.fromResultSet(rs) );
+                } while(rs.next());
+            }        
+            catch(Exception ignore) { }            
+        }
+        else {        
+            try {
+                p.rate = Rate.fromResultSet(rs);
+            }        
+            catch(Exception ignore) { }
+
+            try {
+                p.avgRate = rs.getDouble("rate_avg");
+                p.ratesCount = rs.getInt("rates_count");
+            }        
+            catch(Exception ignore) { }            
+        }
         return p;
     }
     
@@ -59,6 +80,32 @@ public class Product {
             imageUrl = FileServlet.getFileUrl(req, imageUrl);
         }
     }
+
+    public List<Rate> getRates() {
+        return rates;
+    }
+
+    public void setRates(List<Rate> rates) {
+        this.rates = rates;
+    }
+
+    
+    public double getAvgRate() {
+        return avgRate;
+    }
+
+    public void setAvgRate(double avgRate) {
+        this.avgRate = avgRate;
+    }
+
+    public int getRatesCount() {
+        return ratesCount;
+    }
+
+    public void setRatesCount(int ratesCount) {
+        this.ratesCount = ratesCount;
+    }
+
 
     public Rate getRate() {
         return rate;
