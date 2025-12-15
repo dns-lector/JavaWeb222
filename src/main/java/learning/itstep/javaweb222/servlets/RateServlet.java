@@ -1,8 +1,6 @@
 package learning.itstep.javaweb222.servlets;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import jakarta.servlet.ServletException;
@@ -16,9 +14,11 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import learning.itstep.javaweb222.data.DataAccessor;
+import learning.itstep.javaweb222.data.dto.Rate;
 import learning.itstep.javaweb222.data.jwt.JwtToken;
 import learning.itstep.javaweb222.models.rate.RateFormModel;
 import learning.itstep.javaweb222.rest.RestMeta;
+import learning.itstep.javaweb222.rest.RestPagination;
 import learning.itstep.javaweb222.rest.RestResponse;
 import learning.itstep.javaweb222.rest.RestStatus;
 
@@ -42,15 +42,18 @@ public class RateServlet extends HttpServlet {
         this.restResponse = new RestResponse();
         restResponse.setMeta(
                 new RestMeta()
-                .setServiceName("Shop feedbacks API 'Rate'")
-                .setCacheSeconds(1000)
+                .setServiceName("Shop feedbacks API 'Rate': " + req.getMethod())
+                .setCacheSeconds(0)
                 .setManipulations(new String[] {"GET", "POST"})
-                .setLinks(Map.ofEntries(
-                    Map.entry("create-feedback", "POST /rate?item-id={id}")
+                .setLinks( Map.ofEntries(
+                    Map.entry("create-feedback", "POST /rate?item-id={id}"),
+                        // Приклад відхилення від одноманітного інтерфейсу
+                        // у ПОСТ передається ?item-id={id}, а у ГЕТ /{id}
+                    Map.entry("get-feedbacks", "GET /rate/{id}")                        
                 ) )
         );
         jwtToken = (JwtToken) req.getAttribute("JWT");
-        if(jwtToken == null) {
+        if(jwtToken == null && !req.getMethod().equals("GET")) {
             this.restResponse.setStatus( RestStatus.status401 );
         }
         else {
@@ -88,6 +91,30 @@ public class RateServlet extends HttpServlet {
             logger.log(Level.WARNING, "RateServlet::doPost {0}", ex.getMessage() );
             this.restResponse.setStatus( RestStatus.status400 );
             this.restResponse.setData( ex.getMessage() );
+        }
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        String path = req.getPathInfo().substring(1) ;
+        int totalItems = dataAccessor.getRatesCountById(path);
+        try {
+            RestPagination restPagination = RestPagination.fromRequest(
+                    req, 
+                    totalItems,
+                    2
+            );
+            this.restResponse.getMeta().setPagination(restPagination);
+            if(totalItems == 0) {
+                this.restResponse.setData(new Rate[0]);
+            }
+            else {
+                this.restResponse.setData( dataAccessor.getRates(path, restPagination) );
+            }
+        }
+        catch(Exception ex) {
+            this.restResponse.setStatus( RestStatus.status400 );
+            this.restResponse.setData( ex.getMessage() );            
         }
     }
     

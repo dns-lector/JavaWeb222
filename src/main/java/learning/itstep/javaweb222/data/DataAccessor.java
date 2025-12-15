@@ -22,9 +22,11 @@ import learning.itstep.javaweb222.data.dto.Cart;
 import learning.itstep.javaweb222.data.dto.CartItem;
 import learning.itstep.javaweb222.data.dto.Product;
 import learning.itstep.javaweb222.data.dto.ProductGroup;
+import learning.itstep.javaweb222.data.dto.Rate;
 import learning.itstep.javaweb222.data.dto.User;
 import learning.itstep.javaweb222.data.dto.UserAccess;
 import learning.itstep.javaweb222.models.rate.RateFormModel;
+import learning.itstep.javaweb222.rest.RestPagination;
 import learning.itstep.javaweb222.services.config.ConfigService;
 import learning.itstep.javaweb222.services.kdf.KdfService;
 
@@ -561,6 +563,44 @@ public class DataAccessor {
                     ex.getMessage() + " | " + sql);
         }
         return ret;
+    }
+    
+    public int getRatesCountById(String id) {
+        String sql = "SELECT COUNT(*) FROM rates r " +
+        "WHERE r.item_id = ? AND r.rate_deleted_at IS NULL";
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, id);
+            ResultSet rs = prep.executeQuery();
+            rs.next();
+            return rs.getInt(1);
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getRatesCountById {0}", 
+                    ex.getMessage() + " | " + sql);
+            return 0;
+        }    
+    }
+    
+    public List<Rate> getRates(String id, RestPagination pagination) throws Exception {
+        int skip = (pagination.getCurrentPage() - 1) * pagination.getPerPage();
+        String sql = "SELECT * FROM rates r " +
+            "WHERE r.item_id = ? AND r.rate_deleted_at IS NULL ORDER BY r.rate_created_at "
+            + String.format(" LIMIT %d, %d", skip, pagination.getPerPage());
+        
+        try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
+            prep.setString(1, id);
+            ResultSet rs = prep.executeQuery();
+            List<Rate> res = new ArrayList<>();
+            while( rs.next() ) {
+                res.add( Rate.fromResultSet(rs) ) ;
+            }
+            return res;
+        }
+        catch(SQLException ex) {
+            logger.log(Level.WARNING, "DataAccessor::getRatesCountById {0}", 
+                    ex.getMessage() + " | " + sql);
+            return null;
+        }    
     }
     
     /*

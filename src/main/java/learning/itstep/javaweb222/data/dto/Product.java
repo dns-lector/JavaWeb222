@@ -51,11 +51,14 @@ public class Product {
         }        
         catch(Exception ignore) { }
         
-        if(withRates) {
+        if(withRates) {   // TODO: додати команди впорядкування коментарів за датою до запиту-вибірки
+            int i = 0;
             p.rates = new ArrayList<>();
             try {
                 do {
                     p.rates.add( Rate.fromResultSet(rs) );
+                    i += 1;
+                    if( i >= 2 ) break;   // 2 - limit from paginator (RateServlet)
                 } while(rs.next());
             }        
             catch(Exception ignore) { }            
@@ -193,3 +196,6 @@ public class Product {
     
     
 }
+/*
+Впровадити механізм пагінації у власні курсові проєкти
+*/
