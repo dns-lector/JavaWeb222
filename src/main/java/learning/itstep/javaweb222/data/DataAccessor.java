@@ -531,7 +531,8 @@ public class DataAccessor {
                 + "JOIN product_groups pg ON p.product_group_id = pg.pg_id "
                 + "LEFT JOIN rates r ON p.product_id = r.item_id "
                 + "LEFT JOIN users u ON r.user_id = u.user_id "
-                + "WHERE r.rate_deleted_at IS NULL AND (p.product_slug = ? OR p.product_id = ?)";
+                + "WHERE r.rate_deleted_at IS NULL AND (p.product_slug = ? OR p.product_id = ?) "
+                + "ORDER BY r.rate_created_at LIMIT 2 ";   // LIMIT 2 - for pagination
         try( PreparedStatement prep = getConnection().prepareStatement(sql)) {
             prep.setString(1, slug);
             prep.setString(2, slug);
@@ -583,7 +584,7 @@ public class DataAccessor {
     
     public List<Rate> getRates(String id, RestPagination pagination) throws Exception {
         int skip = (pagination.getCurrentPage() - 1) * pagination.getPerPage();
-        String sql = "SELECT * FROM rates r " +
+        String sql = "SELECT * FROM rates r JOIN users u ON r.user_id = u.user_id " +
             "WHERE r.item_id = ? AND r.rate_deleted_at IS NULL ORDER BY r.rate_created_at "
             + String.format(" LIMIT %d, %d", skip, pagination.getPerPage());
         
